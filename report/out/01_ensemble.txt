@@ -1,0 +1,150 @@
+
+==== конфигурации трёх серверов ====
+
+$ cat zk/server1/conf/zoo.cfg
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/Users/seichik/Downloads/hh-zookeeper/zk/server1/data
+clientPort=2181
+clientPortAddress=127.0.0.1
+admin.enableServer=false
+4lw.commands.whitelist=srvr,stat,ruok,mntr
+server.1=127.0.0.1:2888:3888
+server.2=127.0.0.1:2889:3889
+server.3=127.0.0.1:2890:3890
+
+$ diff zk/server1/conf/zoo.cfg zk/server2/conf/zoo.cfg
+4,5c4,5
+< dataDir=/Users/seichik/Downloads/hh-zookeeper/zk/server1/data
+< clientPort=2181
+---
+> dataDir=/Users/seichik/Downloads/hh-zookeeper/zk/server2/data
+> clientPort=2182
+
+$ diff zk/server1/conf/zoo.cfg zk/server3/conf/zoo.cfg
+4,5c4,5
+< dataDir=/Users/seichik/Downloads/hh-zookeeper/zk/server1/data
+< clientPort=2181
+---
+> dataDir=/Users/seichik/Downloads/hh-zookeeper/zk/server3/data
+> clientPort=2183
+
+$ grep -H . zk/server1/data/myid zk/server2/data/myid zk/server3/data/myid
+zk/server1/data/myid:1
+zk/server2/data/myid:2
+zk/server3/data/myid:3
+
+==== запуск ансамбля ====
+
+$ zk/server1/bin/zkServer.sh start
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server1/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+
+$ zk/server2/bin/zkServer.sh start
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server2/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+
+$ zk/server3/bin/zkServer.sh start
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server3/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+
+$ zk/server1/bin/zkServer.sh status
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server1/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: 127.0.0.1. Client SSL: false.
+Error contacting service. It is probably not running.
+
+$ echo srvr | nc 127.0.0.1 2181
+Zookeeper version: 3.9.6-a355171b081b5b60749db8f19cca1528b0df936f, built on 2026-09-03 19:29 UTC
+Latency min/avg/max: 0/0.0/0
+Received: 3
+Sent: 2
+Connections: 1
+Outstanding: 0
+Zxid: 0x0
+Mode: follower
+Node count: 5
+
+$ echo srvr | nc 127.0.0.1 2181..2183
+server1 (порт 2181): Zxid: 0x0 Mode: follower Node count: 5 
+server2 (порт 2182): Zxid: 0x100000000 Mode: leader Node count: 5 
+server3 (порт 2183): Zxid: 0x100000000 Mode: follower Node count: 5 
+
+$ zkCli.sh -server 127.0.0.1:2181 create /hh-test "три сервера"
+Created /hh-test
+
+==== остановка одного сервера: лидер server2 ====
+
+$ zk/server2/bin/zkServer.sh stop
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server2/bin/../conf/zoo.cfg
+Stopping zookeeper ... STOPPED
+новый лидер выбран за 20.9 с
+
+$ echo srvr | nc 127.0.0.1 2181..2183
+server1 (порт 2181): Zxid: 0x100000002 Mode: follower Node count: 6 
+server2 (порт 2182): соединение отклонено
+server3 (порт 2183): Zxid: 0x200000000 Mode: leader Node count: 6 
+
+$ zkCli.sh -server 127.0.0.1:2181 get /hh-test
+три сервера
+
+$ zkCli.sh -server 127.0.0.1:2183 set /hh-test "два сервера из трёх"
+
+$ zkCli.sh -server 127.0.0.1:2181 get /hh-test
+два сервера из трёх
+
+==== остановка второго сервера: server1 ====
+
+$ zk/server1/bin/zkServer.sh stop
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server1/bin/../conf/zoo.cfg
+Stopping zookeeper ... STOPPED
+
+$ echo srvr | nc 127.0.0.1 2181..2183
+server1 (порт 2181): соединение отклонено
+server2 (порт 2182): соединение отклонено
+server3 (порт 2183): This ZooKeeper instance is not currently serving requests
+
+$ zkCli.sh -server 127.0.0.1:2183 get /hh-test
+org.apache.zookeeper.ClientCnxn$EndOfStreamException: Unable to read additional data from server sessionid 0x0, likely server has closed socket
+        at org.apache.zookeeper.ClientCnxnSocketNIO.doIO(ClientCnxnSocketNIO.java:77)
+        at org.apache.zookeeper.ClientCnxnSocketNIO.doTransport(ClientCnxnSocketNIO.java:356)
+        at org.apache.zookeeper.ClientCnxn$SendThread.run(ClientCnxn.java:1290)
+KeeperErrorCode = ConnectionLoss for /hh-test
+
+==== запуск остановленных серверов ====
+
+$ zk/server2/bin/zkServer.sh start
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server2/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+
+$ zk/server1/bin/zkServer.sh start
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server1/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+кворум собран за 1.6 с
+
+$ echo srvr | nc 127.0.0.1 2181..2183
+server1 (порт 2181): Zxid: 0x200000004 Mode: follower Node count: 6 
+server2 (порт 2182): Zxid: 0x200000004 Mode: follower Node count: 6 
+server3 (порт 2183): Zxid: 0x300000000 Mode: leader Node count: 6 
+
+$ zkCli.sh -server 127.0.0.1:2182 get -s /hh-test
+два сервера из трёх
+cZxid = 0x100000002
+ctime = Thu Nov 12 09:48:57 EST 2026
+mZxid = 0x200000003
+mtime = Thu Nov 12 09:49:24 EST 2026
+pZxid = 0x100000002
+cversion = 0
+dataVersion = 1
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 35
+numChildren = 0

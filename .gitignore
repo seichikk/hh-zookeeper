@@ -1,0 +1,15 @@
+zk/*.tar.gz
+zk/server*/*
+!zk/server*/conf/
+zk/server*/conf/*
+!zk/server*/conf/zoo.cfg
+!zk/server*/data/
+zk/server*/data/*
+!zk/server*/data/myid
+__pycache__/
+*.pyc
+.DS_Store
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc

@@ -1,0 +1,56 @@
+
+==== java 17 ====
+
+$ /usr/libexec/java_home -V
+Matching Java Virtual Machines (2):
+    25.0.3 (x86_64) "Eclipse Adoptium" - "OpenJDK 25.0.3" /Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home
+    17.0.21 (x86_64) "Eclipse Adoptium" - "OpenJDK 17.0.21" /Users/seichik/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home
+/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home
+
+$ echo JAVA_HOME=/Users/seichik/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home
+JAVA_HOME=/Users/seichik/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home
+
+$ /Users/seichik/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java -version
+openjdk version "17.0.21" 2026-10-20
+OpenJDK Runtime Environment Temurin-17.0.21+9 (build 17.0.21+9)
+OpenJDK 64-Bit Server VM Temurin-17.0.21+9 (build 17.0.21+9, mixed mode)
+
+==== zookeeper 3.9.6, три копии ====
+
+$ shasum -a 512 zk/apache-zookeeper-3.9.6-bin.tar.gz
+e999626df06de30dc8bb53bb51da9bb786b1658406adafc6b92f104d72ca25e869f70a57c83a726f8b9558cc0fb519fc20f201aa5d6da09884bc4be5fe6dd3b0  zk/apache-zookeeper-3.9.6-bin.tar.gz
+zk/apache-zookeeper-3.9.6-bin.tar.gz: OK
+
+$ ls zk/server1 zk/server1/conf zk/server1/data
+zk/server1:
+LICENSE.txt
+NOTICE.txt
+README.md
+README_packaging.md
+bin
+conf
+data
+docs
+lib
+logs
+
+zk/server1/conf:
+configuration.xsl
+logback.xml
+zoo.cfg
+zoo_sample.cfg
+
+zk/server1/data:
+myid
+version-2
+zookeeper_server.pid
+
+$ zk/server1/bin/zkServer.sh version
+ZooKeeper JMX enabled by default
+Using config: /Users/seichik/Downloads/hh-zookeeper/zk/server1/bin/../conf/zoo.cfg
+Apache ZooKeeper, version 3.9.6 2026-09-03 19:29 UTC
+
+==== образ с python и kazoo для координатора ====
+
+$ docker run --rm hh-zk-py:1 python -c "import sys, importlib.metadata as m; print('python', sys.version.split()[0], *[p + ' ' + m.version(p) for p in ('kazoo', 'pyarrow', 'boto3')])"
+python 3.12.16 kazoo 2.11.0 pyarrow 26.0.0 boto3 1.43.116

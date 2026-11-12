@@ -1,0 +1,15 @@
+def publish(self, prefix, summary, same):
+    pointer = json.dumps({"owner": self.name, "epoch": self.epoch, "prefix": prefix, "vacancies": summary["vacancies"],
+                          "unique": summary["unique"], "sums": summary["sums"], "same_as_hw3": same}).encode()
+    if not FENCING:
+        st = self.retry(self.zk.set, RESULT, pointer)
+    else:
+        res = self.retry(self.fenced, RESULT, pointer)
+        err = next((r for r in res if isinstance(r, Exception)), None)
+        if err is not None:
+            now = self.retry(self.zk.get, EPOCH)[0].decode()
+            self.log(f"запись результата отклонена: {type(err).__name__}, моя эпоха {self.epoch}, в zookeeper эпоха {now}")
+            self.rc = 1
+            return
+        st = res[1]
+    self.log(f"записал результат: {RESULT} версия {st.version}, эпоха {self.epoch}, s3://{c.BUCKET}/{prefix}/")

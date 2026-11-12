@@ -1,0 +1,22 @@
+def checkpoint(self, tid, res):
+    node = f"{CHECKPOINT}/task-{tid:04d}"
+    if self.retry(self.zk.exists, node):
+        meta = json.loads(self.retry(self.zk.get, node)[0])
+        self.log(f"задача {tid} готова, но в чекпоинте она уже есть (эпоха {meta['epoch']}, {meta['owner']})")
+        return
+    key = f"zk/{self.a.run}/checkpoint/task-{tid:04d}-e{self.epoch}.json.gz"
+    c.put_bytes(self.s3, key, pack(res), "application/gzip")
+    meta = json.dumps({"key": key, "epoch": self.epoch, "owner": self.name}).encode()
+    if FENCING:
+        out = self.retry(self.fenced, node, meta, True)
+        if isinstance(out[1], NodeExistsError):
+            return
+        if isinstance(out[0], Exception):
+            self.log(f"чекпоинт задачи {tid} отклонён: {type(out[0]).__name__}, моя эпоха {self.epoch}")
+            return
+    else:
+        try:
+            self.retry(self.zk.create, node, meta)
+        except NodeExistsError:
+            return
+    self.log(f"задача {tid} готова: строк {res['scanned']}, вакансий {len(res['vacancies'])}, чекпоинт сохранён")

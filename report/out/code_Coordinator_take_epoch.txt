@@ -1,0 +1,11 @@
+def take_epoch(self):
+    mine = f"{self.election.lock.path}/{self.election.lock.node}"
+    while True:
+        data, st = self.retry(self.zk.get, EPOCH)
+        epoch = int(data or b"0") + 1
+        res = self.retry(self.epoch_tx, mine, epoch, st.version)
+        if not isinstance(res[0], Exception) and not isinstance(res[1], Exception):
+            return epoch, res[1].version
+        if not isinstance(res[0], RolledBackError):
+            self.log(f"узла {mine} уже нет ({type(res[0]).__name__}), лидерство потеряно до получения эпохи")
+            return None, None

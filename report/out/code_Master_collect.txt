@@ -1,0 +1,6 @@
+def collect(self, limit):
+    while len(self.futures) > limit:
+        before = set(self.done)
+        super().collect(len(self.futures) - 1)
+        for tid in sorted(set(self.done) - before):
+            self.on_done(tid, self.done[tid])

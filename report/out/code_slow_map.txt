@@ -1,0 +1,3 @@
+def slow_map(delay, *args):
+    time.sleep(delay)
+    return mr.map_task(*args)

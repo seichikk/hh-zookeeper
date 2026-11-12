@@ -1,0 +1,12 @@
+Connecting to 127.0.0.1:2183
+Welcome to ZooKeeper!
+JLine support is enabled
+
+WATCHER::
+
+WatchedEvent state:SyncConnected type:None path:null zxid: -1
+[zk: 127.0.0.1:2183(CONNECTED) 0] Created /hh-eph2
+[zk: 127.0.0.1:2183(CONNECTED) 1] 
+WATCHER::
+
+WatchedEvent state:Closed type:None path:null zxid: -1

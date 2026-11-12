@@ -1,0 +1,16 @@
+09:48:53,004 INFO  [QuorumPeer:o.a.z.s.q.QuorumPeer@1470] - LOOKING
+09:48:53,047 INFO  [QuorumPeer:o.a.z.s.q.Follower@76] - FOLLOWING - LEADER ELECTION TOOK - 42 MS
+09:48:59,659 INFO  [QuorumPeer:o.a.z.s.q.Follower@284] - shutdown Follower
+09:48:59,663 INFO  [FLE] Notification: my state:FOLLOWING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x2, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:
+09:48:59,664 INFO  [QuorumPeer:o.a.z.s.q.QuorumPeer@1470] - LOOKING
+09:48:59,882 INFO  [QuorumPeer:o.a.z.s.q.Leader@637] - LEADING - LEADER ELECTION TOOK - 217 MS
+09:48:59,883 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:00,090 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:00,497 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:01,305 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:02,912 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:06,120 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:12,531 INFO  [FLE] Notification: my state:LEADING; n.sid:1, n.state:LOOKING, n.leader:1, n.round:0x3, n.peerEpoch:0x1, n.zxid:0x100000002, message format version:0x
+09:49:19,894 INFO  [QuorumPeer:o.a.z.s.q.Leader@868] - Shutdown called. For the reason Forcing shutdown
+09:49:19,896 INFO  [QuorumPeer:o.a.z.s.q.QuorumPeer@1470] - LOOKING
+09:49:20,106 INFO  [QuorumPeer:o.a.z.s.q.Leader@637] - LEADING - LEADER ELECTION TOOK - 211 MS

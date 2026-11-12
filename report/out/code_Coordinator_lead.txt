@@ -1,0 +1,16 @@
+def lead(self):
+    t0 = time.perf_counter()
+    self.epoch, self.epoch_version = self.take_epoch()
+    if self.epoch is None:
+        self.rc = 1
+        return
+    self.log(f"стал лидером, эпоха {self.epoch}")
+    job = self.check_job()
+    if job is None:
+        self.rc = 1
+        return
+    done = self.load_checkpoint()
+    counts, vacancies, summary = self.compute(done, job)
+    prefix, same = self.save(counts, vacancies, summary)
+    self.publish(prefix, summary, same)
+    self.log(f"работа заняла {time.perf_counter() - t0:.1f} с")

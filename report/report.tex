@@ -1,0 +1,323 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage[a4paper,left=2cm,right=1.7cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{fvextra}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+
+\captionsetup{font=small,labelfont=bf}
+\setlist{nosep,leftmargin=1.4em}
+\setlength{\parskip}{0.35em}
+\setlength{\emergencystretch}{3em}
+
+\newcommand{\studentName}{Бровкин Аким Алексеевич}
+\newcommand{\studentGroup}{J3310}
+\newcommand{\studentIsu}{465282}
+\newcommand{\repoUrl}{\texttt{github.com/seichikk/hh-zookeeper}}
+
+\newcommand{\nodata}{\mbox{\textcolor{red!70!black}{\footnotesize[нет данных]}}}
+\newcommand{\defvar}[1]{\expandafter\newcommand\csname #1\endcsname{\nodata}}
+\defvar{ensFirst}\defvar{ensSecond}\defvar{ensLast}\defvar{ensReelect}\defvar{ensQuorum}
+\defvar{ephHup}\defvar{ephQuit}
+\defvar{nofenceSwitch}\defvar{nofencePaused}\defvar{fenceSwitch}\defvar{fencePaused}
+\defvar{nofenceEpochA}\defvar{nofenceEpochB}\defvar{fenceEpochA}\defvar{fenceEpochB}
+
+\InputIfFileExists{out/vars-ensemble.tex}{}{}
+\InputIfFileExists{out/vars-ephemeral.tex}{}{}
+\InputIfFileExists{out/vars-nofence.tex}{}{}
+\InputIfFileExists{out/vars-fence.tex}{}{}
+
+\makeatletter
+\newcommand{\tabfile}[2]{\IfFileExists{out/#1}{\@@input out/#1 }{#2}}
+\makeatother
+
+\newcommand{\shot}[3]{\begin{figure}[H]\centering\IfFileExists{img/#1.png}{\includegraphics[width=\linewidth,height=0.5\textheight,keepaspectratio]{img/#1.png}}{\fbox{\parbox[c][3.2cm][c]{0.92\linewidth}{\centering\small\textcolor{red!70!black}{здесь будет скриншот \texttt{img/\detokenize{#1}.png}}\\[5pt]#3}}}\caption{#2}\label{fig:#1}\end{figure}}
+
+\newcommand{\cmdout}[1]{\IfFileExists{out/#1.txt}{\VerbatimInput[fontsize=\scriptsize,breaklines,breakanywhere,frame=single,framesep=2mm,rulecolor=\color{black!35}]{out/#1.txt}}{\begin{center}\fbox{\parbox{0.92\linewidth}{\centering\small\textcolor{red!70!black}{нет файла \texttt{out/\detokenize{#1}.txt}: его создаст скрипт из папки \texttt{scripts}}}}\end{center}}}
+
+\newcommand{\code}[1]{\IfFileExists{out/#1.txt}{\VerbatimInput[fontsize=\footnotesize,breaklines,frame=leftline,framesep=3mm,rulecolor=\color{blue!40},xleftmargin=2mm]{out/#1.txt}}{\begin{center}\fbox{\small\textcolor{red!70!black}{фрагмент кода \texttt{\detokenize{#1}} появится после \texttt{bash scripts/05\_report.sh}}}\end{center}}}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+{\large Университет ИТМО\par}
+\vspace{4.5cm}
+{\LARGE\bfseries Отчёт по домашнему заданию № 4\par}
+\vspace{0.6cm}
+{\Large «Обеспечение отказоустойчивости\\средствами Apache ZooKeeper»\par}
+\vspace{0.6cm}
+{\normalsize Расчёт из ДЗ-3, вариант 4: «Программист, разработчик на C\# и .NET»\par}
+\vfill
+\begin{flushright}
+\begin{tabular}{@{}l@{}}
+Выполнил: студент группы \studentGroup\\
+\studentName\\
+ИСУ \studentIsu\\[1.2em]
+\end{tabular}
+\end{flushright}
+\vspace{2cm}
+{Санкт-Петербург, 2026\par}
+\end{titlepage}
+
+\newpage
+
+\section{Задача и стенд}
+
+В ДЗ-3 я считал частоты навыков, пар и троек навыков в вакансиях «Программист, разработчик на C\# и .NET». Считал своим MapReduce, который читает датасет из объектного хранилища RustFS по протоколу S3. В этом задании тот же расчёт нужно сделать отказоустойчивым. Для этого я поднимаю ансамбль из трёх серверов ZooKeeper и запускаю две копии координатора. Лидера я приостанавливаю посреди расчёта. Запасной координатор должен доделать работу с чекпоинта и получить те же числа, что в ДЗ-3. Устаревший лидер после паузы без защиты портит результат, а с защитой по эпохе~--- нет.
+
+Код, скрипты, конфигурации серверов, журналы координаторов и выводы всех команд лежат в репозитории
+\begin{center}\href{https://github.com/seichikk/hh-zookeeper}{\repoUrl}\end{center}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Компьютер & MacBook Pro 16 (MacBookPro16,1), Intel Core i7-9750H, 6 ядер, 32 ГБ \\
+Система & macOS 26.6.2, Docker Desktop (Engine 29.8.0) \\
+Java & Temurin 17.0.21 \\
+ZooKeeper & 3.9.6, три копии на одном компьютере, клиентские порты 2181--2183 \\
+Хранилище & RustFS 1.0.1 из ДЗ-3, бакет \texttt{hh-lake} \\
+Координатор & Python 3.12, kazoo 2.11.0, pyarrow 26.0.0, boto3 (в Docker-контейнере) \\
+\bottomrule
+\end{tabular}
+\caption{Стенд}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >={Stealth[length=2mm]},
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, minimum height=9mm},
+  zk/.style={box, fill=orange!15, minimum width=2.6cm}, co/.style={box, fill=blue!10, minimum width=3.4cm},
+  s3/.style={box, fill=green!10}]
+\node[zk] (z1) at (0,1.5) {server1, :2181};
+\node[zk] (z2) at (0,0) {server2, :2182};
+\node[zk] (z3) at (0,-1.5) {server3, :2183};
+\node[co] (a) at (6,0.9) {coord-a};
+\node[co] (b) at (6,-0.9) {coord-b};
+\node[s3, text width=3.6cm] (s3) at (11.6,0) {RustFS (S3), \texttt{hh-lake}\\датасет, чекпоинты,\\результаты};
+\draw[<->] (a.west) -- (z1.east);
+\draw[<->] (b.west) -- (z3.east);
+\draw[<->] (z1) -- (z2);
+\draw[<->] (z2) -- (z3);
+\draw[<->] (a.east) -- (s3.west);
+\draw[<->] (b.east) -- (s3.west);
+\node[font=\scriptsize, align=center] at (3.05,0) {сессия 10 с: выборы,\\эпоха, чекпоинт,\\указатель};
+\node[font=\scriptsize, align=center] at (8.75,1.15) {Range GET,\\чекпоинты};
+\node[font=\scriptsize, align=center] at (-2.3,0) {кворум\\2 из 3};
+\end{tikzpicture}
+\caption{Стенд: три сервера ZooKeeper на компьютере, координаторы в контейнерах, хранилище из ДЗ-3}
+\end{figure}
+
+\section{Этап 1. Java 17 и три копии ZooKeeper}
+
+Java 17 я поставил без установщика. Архив Temurin 17.0.21 распакован в \nolinkurl{~/Library/Java/JavaVirtualMachines/temurin-17.jdk}. Из этой папки её видит штатная утилита macOS, поэтому \texttt{JAVA\_HOME} задаётся так: \texttt{export JAVA\_HOME=\$(/usr/libexec/java\_home -v 17)}. Без этой переменной не обойтись: на компьютере уже стоит Java 25, и скрипты ZooKeeper взяли бы её. Скрипты из папки \texttt{scripts} выставляют \texttt{JAVA\_HOME} сами.
+
+ZooKeeper 3.9.6 скачан из архива Apache, SHA-512 архива совпал с опубликованным. Архив распакован три раза, в \texttt{zk/server1}, \texttt{zk/server2} и \texttt{zk/server3}.
+
+\cmdout{00_setup}
+
+\section{Этап 2. Ансамбль}
+
+\subsection{Конфигурации}
+
+Все три сервера работают на одном компьютере, поэтому у каждой копии свой \texttt{conf/zoo.cfg}. Строки \texttt{server.1}--\texttt{server.3} у всех одинаковые, потому что каждый сервер должен знать весь состав ансамбля. А вот \texttt{clientPort} (2181, 2182, 2183) и \texttt{dataDir} у каждой копии свои. Если бы два сервера писали в одну папку, они затирали бы друг другу журнал транзакций и снимки. Порты для связи серверов между собой тоже разные, они записаны прямо в строках \texttt{server.N}: 2888--2890 для обмена с лидером и 3888--3890 для выборов. В \texttt{dataDir} лежит файл \texttt{myid} с номером сервера. По нему сервер понимает, какая из строк \texttt{server.N} описывает его самого.
+
+Сверх обязательного в конфигурации ещё три строки:
+\begin{itemize}
+  \item \texttt{clientPortAddress=127.0.0.1}: серверы слушают только локальный интерфейс. Координаторы из Docker всё равно до них достают через \texttt{host.docker.internal}.
+  \item \texttt{admin.enableServer=false}: встроенный HTTP-сервер AdminServer по умолчанию занимает порт 8080, и второй и третий сервер упали бы на нём.
+  \item \texttt{4lw.commands.whitelist}: разрешены четырёхбуквенные команды \texttt{srvr}, \texttt{stat}, \texttt{ruok}, \texttt{mntr}. Через \texttt{srvr} я смотрю роли.
+\end{itemize}
+
+\subsection{Роли серверов}
+
+Штатный способ узнать роль сервера~--- \texttt{zkServer.sh status}. У меня он на всех трёх серверах отвечал «Error contacting service. It is probably not running.», хотя серверы работали и кворум был собран. Разбираясь, я увидел, что \texttt{status} запускает \texttt{FourLetterWordMain}. Тот отправляет \texttt{srvr} и сразу закрывает свою половину соединения. В журнале сервера при этом есть строка «Processing srvr command», а клиент получает пустой ответ. Проверил отдельно: если послать \texttt{srvr} через \texttt{nc} и сразу закрыть запись, ответ пустой, а если подождать полсекунды, приходит полный ответ со строкой \texttt{Mode}. Поэтому роли я смотрю той же командой \texttt{srvr}, только через \texttt{nc} без мгновенного закрытия.
+
+\subsection{Потеря одного и двух серверов}
+
+После запуска лидером стал server\ensFirst, его я и остановил первым. Оставшиеся два сервера выбрали нового лидера, и ансамбль продолжил работать: чтение и запись через любой из них проходят.
+
+В этом прогоне выборы заняли \ensReelect~с, хотя в пробном прогоне на том же стенде хватило 4~с. Причина видна в журнале server3 (фрагмент ниже). server3 объявил себя лидером уже через 217~мс, но server1 к этому моменту ушёл в следующий раунд выборов и голосовал за себя. Лидеру, за которым не пошёл кворум последователей, отводится $\texttt{initLimit} \cdot \texttt{tickTime} = 10 \cdot 2 = 20$~с. Когда это время вышло, server3 сложил полномочия («Forcing shutdown»), начался новый раунд, и через 211~мс server1 стал последователем. Все эти 20~с ансамбль запросы не принимал, но данные не потерялись.
+
+\cmdout{01_server3}
+
+Затем я остановил server\ensSecond. Последний живой server\ensLast{} остался без кворума. На \texttt{srvr} он отвечает «This ZooKeeper instance is not currently serving requests», а \texttt{zkCli} получает \texttt{ConnectionLoss}. После запуска обоих серверов кворум собрался за \ensQuorum~с. Узел \texttt{/hh-test} хранит значение, записанное, когда работали два сервера из трёх (\texttt{dataVersion = 1}).
+
+\cmdout{01_ensemble}
+\shot{01_roles}{Запуск ансамбля, роли и остановка лидера}{терминал после \texttt{bash scripts/01\_ensemble.sh}}
+\shot{01_quorum}{Остановка второго сервера и возвращение кворума}{терминал после \texttt{bash scripts/01\_ensemble.sh}}
+
+\subsection{Эфемерный узел}
+
+Второе окно~--- это отдельный процесс \texttt{zkCli}, подключённый к server2. Из него создаётся эфемерный узел \texttt{/hh-eph}. В выводе \texttt{get -s} у узла заполнено поле \texttt{ephemeralOwner}: это номер сессии второго окна. Закрытие окна терминала посылает процессу сигнал SIGHUP. \texttt{zkCli} завершается, не успев закрыть сессию, поэтому ZooKeeper ждёт тайм-аут сессии (у \texttt{zkCli} он 30~с) и только потом удаляет узел. Узел пропал через \ephHup~с после закрытия окна. Если же выйти командой \texttt{quit}, клиент сам закрывает сессию, и узел пропадает сразу. Цифра \ephQuit~с здесь~--- время до первой проверки, ведь каждая проверка запускает \texttt{zkCli}, а значит, и новую JVM.
+
+\cmdout{02_ephemeral}
+
+Что было во втором окне:
+
+\cmdout{02_window2}
+\shot{02_ephemeral}{Эфемерный узел: закрытие окна и выход по quit}{терминал после \texttt{bash scripts/02\_ephemeral.sh}}
+
+\section{Координатор из ДЗ-3 поверх ZooKeeper}\label{sec:coord}
+
+Сам расчёт не менялся: \texttt{lab/mapreduce.py} и \texttt{lab/common.py} скопированы из ДЗ-3 без правок. Новый файл \texttt{lab/coordinator.py} берёт оттуда мастер, map- и reduce-задачи и добавляет к ним выборы, эпоху, чекпоинты и публикацию результата. В ZooKeeper у координаторов такое дерево:
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+/hh
+|-- election/            эфемерные последовательные узлы участников выборов
+|-- job                  что считается: объект, его ETag, размер, размер чанка
+|-- epoch                номер текущей эпохи
+|-- checkpoint/
+|   |-- task-0000        {"key": "zk/nofence/checkpoint/task-0000-e1.json.gz", "epoch": 1, "owner": "a"}
+|   `-- ...
+`-- result               указатель на опубликованный результат
+\end{Verbatim}
+
+\begin{enumerate}
+  \item \textbf{Выборы.} Используется рецепт \texttt{Election} из kazoo. Каждый координатор создаёт в \texttt{/hh/election} эфемерный последовательный узел. Лидер~--- владелец узла с наименьшим номером, остальные следят каждый за соседним узлом перед собой. Сессия открывается с тайм-аутом 10~с. Если лидер молчит дольше, сервер закрывает его сессию и удаляет узел, а следующий по очереди получает уведомление и становится лидером.
+  \item \textbf{Эпоха.} Новый лидер первым делом увеличивает число в \texttt{/hh/epoch}. Это запрос \texttt{multi} из двух операций: \texttt{check} своего узла в \texttt{/hh/election} и \texttt{setData(/hh/epoch)} с той версией, которую лидер только что прочитал. Два лидера не могут получить одну эпоху. А если сессия лидера уже истекла и его узел удалён, транзакция не пройдёт, и эпоху он не получит. Без этой проверки лидер, замёрзший сразу после выборов, после разморозки взял бы эпоху новее, чем у запасного, и прошёл бы защиту. Номер эпохи совпадает с версией узла после записи, и эту версию координатор запоминает. Сброс задания (\texttt{reset}) счётчик эпох не удаляет, а наоборот увеличивает и только потом чистит остальное. Так все эпохи прошлого прогона сразу устаревают. Если бы счётчик создавался заново, координатор, уцелевший от прошлого прогона, совпал бы по версии с новым лидером.
+  \item \textbf{Задание.} В \texttt{/hh/job} первый лидер записывает, что именно считается: объект, его ETag, размер и размер чанка. Следующий лидер сверяет это со своими параметрами. Чужой чекпоинт, например посчитанный с другим размером чанка, он продолжать не станет. Каждый Range GET идёт с заголовком \texttt{If-Match}. Если объект в S3 подменят посреди расчёта, чтение упадёт с \texttt{PreconditionFailed}, и куски двух разных версий файла не склеятся.
+  \item \textbf{Чекпоинт.} После каждой map-задачи её результат сжимается и кладётся в S3: это частичные счётчики для четырёх редьюсеров после combiner'а и отобранные вакансии. Затем в \texttt{/hh/checkpoint} создаётся узел \texttt{task-NNNN} со ссылкой на объект. Порядок важен: сначала S3, потом znode. Если лидер умрёт между этими шагами, задача просто посчитается заново. Разбиение на задачи детерминированное: те же чанки по 32~МиБ и та же граница записи, что в ДЗ-3. Поэтому номер задачи значит одно и то же для любого координатора. Новый лидер читает список готовых задач, берёт их результаты из S3 и считает только остальные. Готовую задачу в чекпоинте координатор не перезаписывает.
+  \item \textbf{Публикация.} Каждый лидер пишет файлы \texttt{k1.csv}--\texttt{k3.csv}, \texttt{vacancies.jsonl} и \texttt{summary.json} в свою папку \texttt{zk/\textit{запуск}/result-e\textit{эпоха}-\textit{имя}}, а затем переключает на неё указатель \texttt{/hh/result}. Без защиты это обычный \texttt{setData}. С \texttt{FENCING=1} это запрос \texttt{multi} из двух операций: \texttt{check(/hh/epoch, версия моей эпохи)} и \texttt{setData(/hh/result)}. Сервер выполняет их атомарно. Если эпоха уже сменилась, \texttt{check} не проходит, и вся транзакция откатывается с \texttt{BadVersionError}. С \texttt{FENCING=1} так же, через \texttt{multi} с проверкой эпохи, создаются узлы чекпоинта и манифест задания.
+\end{enumerate}
+
+Весь расчёт из ДЗ-3 занимает около 6~с, и приостановить лидера посреди него вручную нереально. Поэтому у координатора есть параметр \texttt{-{}-task-delay}: перед каждой map-задачей маппер спит заданное число секунд. В опытах задержка 1~с, и расчёт растягивается примерно до 40~с. Маппер работает один, поэтому задачи идут по порядку. На результат задержка не влияет.
+
+\code{code_slow_map}
+\code{code_Master_collect}
+\code{code_Coordinator_take_epoch}
+\code{code_Coordinator_lead}
+\code{code_Coordinator_checkpoint}
+\code{code_Coordinator_publish}
+
+\section{Этап 3. Пауза лидера без защиты}\label{sec:nofence}
+
+Скрипт \texttt{03\_failover.sh} запускает два контейнера с координатором: сначала \texttt{coord-a}, за ним \texttt{coord-b}. Перед этим скрипт сбрасывает задание командой \texttt{reset}, а она сама поднимает эпоху, поэтому первый лидер получает эпоху \nofenceEpochA, а не 1. Лидером становится a (эпоха \nofenceEpochA), b ждёт. Когда a сохранит в чекпоинт 8 задач, скрипт замораживает его командой \texttt{docker pause}. Для процесса это то же самое, что SIGSTOP: он жив, но не выполняется и не шлёт серверу пинги. Когда b закончит работу и пройдёт не меньше 40~с, контейнер a размораживается. Пауза длилась \nofencePaused~с.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lrlp{9.4cm}@{}}
+\toprule
+Время & От паузы, с & Кто & Событие \\
+\midrule
+\tabfile{timeline-nofence.tex}{\nodata & & & \\}
+\bottomrule
+\end{tabular}
+\caption{Ход опыта без защиты (из журналов \texttt{logs/nofence-a.log}, \texttt{logs/nofence-b.log})}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Смена лидера.} b стал лидером через \nofenceSwitch~с после паузы. Это тайм-аут сессии. Сервер отсчитывает 10~с не от момента паузы, а от последнего пакета клиента, и проверяет истёкшие сессии с шагом \texttt{tickTime}, то есть раз в 2~с. Последний пакет a ушёл не больше чем за 1,3~с до паузы: координатор обращается к ZooKeeper после каждой задачи. Поэтому смена лидера занимает примерно от 9 до 12,5~с, у меня вышло \nofenceSwitch{} и \fenceSwitch~с.
+  \item \textbf{Чекпоинт.} b прочитал из чекпоинта 8 готовых задач (0--7) и досчитал оставшиеся 18 из 26. Контрольные числа совпали с ДЗ-3: 4356 вакансий, 1164 навыка, 17\,198 пар и 114\,332 тройки, суммы частот 22\,866, 92\,865 и 310\,903. Совпали и SHA-256 файлов \texttt{k1.csv}--\texttt{k3.csv} и \texttt{vacancies.jsonl}. b записал результат: \texttt{/hh/result} версии 1, эпоха \nofenceEpochB.
+  \item \textbf{Устаревший лидер.} После разморозки a получил от kazoo состояния SUSPENDED и LOST: его сессия давно закрыта. kazoo тут же открыл новую сессию (CONNECTED), и a продолжил работу с того места, где остановился. Он по-прежнему считает себя лидером, потому что в его коде нет места, где лидерство могло бы пропасть. Задачи 8--25 он досчитал сам, хотя их результаты от b уже лежали в чекпоинте. Затем он записал результат второй раз: \texttt{/hh/result} версии 2, эпоха \nofenceEpochA.
+\end{itemize}
+
+В итоге указатель (\texttt{dataVersion = 2}) смотрит на результат устаревшего лидера эпохи \nofenceEpochA. Числа здесь совпали, потому что расчёт детерминированный. Если бы данные или код у двух лидеров различались, в указателе остался бы результат того, кто записал последним, а не того, кто сейчас лидер.
+
+\cmdout{03_failover}
+\shot{03_failover}{Пауза лидера без защиты: смена лидера и вторая запись результата}{терминал после \texttt{bash scripts/03\_failover.sh}}
+\shot{03_result}{Итог опыта без защиты: две строки «записал результат», указатель версии 2}{терминал после \texttt{bash scripts/03\_failover.sh}}
+
+\section{Этап 4. Пауза лидера с защитой по эпохе}\label{sec:fence}
+
+Тот же опыт с \texttt{FENCING=1} (\texttt{bash scripts/04\_fencing.sh}). b стал лидером через \fenceSwitch~с после паузы, пауза длилась \fencePaused~с. Эпохи здесь \fenceEpochA{} и \fenceEpochB, потому что счётчик продолжил расти после прошлого опыта. Как и в прошлый раз, b взял 8 задач из чекпоинта, досчитал остальные и записал результат: версия 1, эпоха \fenceEpochB. a после паузы досчитал всё и попытался опубликовать результат, но запрос \texttt{multi} вернул \texttt{BadVersionError}: в \texttt{/hh/epoch} уже эпоха \fenceEpochB, а у a эпоха \fenceEpochA. Указатель остался от b (\texttt{owner = b}, \texttt{epoch = \fenceEpochB}, \texttt{dataVersion = 1}), a завершился с кодом 1. Результат в указателе один, и он совпадает с ДЗ-3.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lrlp{9.4cm}@{}}
+\toprule
+Время & От паузы, с & Кто & Событие \\
+\midrule
+\tabfile{timeline-fence.tex}{\nodata & & & \\}
+\bottomrule
+\end{tabular}
+\caption{Ход опыта с защитой (из журналов \texttt{logs/fence-a.log}, \texttt{logs/fence-b.log})}
+\end{table}
+
+\cmdout{04_fencing}
+\shot{04_fencing}{Пауза лидера с защитой по эпохе: запись устаревшего лидера отклонена}{терминал после \texttt{bash scripts/04\_fencing.sh}}
+\shot{04_result}{Итог опыта с защитой: BadVersionError и указатель от запасного координатора}{терминал после \texttt{bash scripts/04\_fencing.sh}}
+
+\section{Ответы на вопросы}
+
+\subsection{Почему серверов три, а не два и не четыре}
+
+ZooKeeper принимает запись, только когда её подтвердило большинство серверов ансамбля, и лидера тоже выбирает большинство. Для $n$ серверов большинство~--- это $\lfloor n/2 \rfloor + 1$ сервер. Значит, ансамбль переживает отказ $n - \lfloor n/2 \rfloor - 1$ серверов.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}ccc@{}}
+\toprule
+Серверов & Кворум & Переживает отказов \\
+\midrule
+1 & 1 & 0 \\
+2 & 2 & 0 \\
+3 & 2 & 1 \\
+4 & 3 & 1 \\
+5 & 3 & 2 \\
+\bottomrule
+\end{tabular}
+\caption{Размер кворума}
+\end{table}
+
+Два сервера не надёжнее одного. Большинство из двух~--- это оба, и остановка любого останавливает весь ансамбль. Отказ при этом вдвое вероятнее, ведь сломаться может любой из двух. Три сервера~--- самый маленький ансамбль, который переживает отказ. Это и видно на этапе 2: без одного сервера ансамбль работает, без двух нет.
+
+Четвёртый сервер устойчивости не добавляет. Кворум вырастает до трёх, и ансамбль по-прежнему переживает только один отказ. Зато каждая запись теперь ждёт подтверждения от трёх серверов вместо двух. А если сеть разделится на две половины по два сервера, большинства не будет ни в одной, и встанут обе. Поэтому ансамбль собирают из нечётного числа серверов: 3, 5, 7.
+
+Само требование большинства нужно, чтобы не появилось двух лидеров. Два кворума всегда пересекаются хотя бы по одному серверу, а он помнит последнюю подтверждённую запись и не проголосует за отставшего кандидата.
+
+\subsection{Почему защиту по эпохе проверяет получатель записи, а не ZooKeeper}
+
+ZooKeeper решает, кто лидер, но в самой записи не участвует и остановить чужой процесс не может. Когда сессия a истекла, ZooKeeper удалил его узел выборов и отдал лидерство b. Сам a об этом не узнал: он был заморожен. После разморозки его код продолжил работать с того же места. В журнале видно, что LOST пришёл через доли секунды после разморозки. Но обработчик состояния работает в отдельном потоке kazoo и основной поток не прерывает. Устаревший лидер узнаёт о потере лидерства позже, чем она случилась, и в этом промежутке успевает писать.
+
+Проверка «я ещё лидер?» перед записью тоже не спасает. Пауза (сборка мусора, своп, SIGSTOP, долгий сетевой запрос) может случиться между проверкой и записью, и тогда запись уйдёт уже от бывшего лидера. Проверка и запись должны быть одной неделимой операцией. Выполнить её может только тот, кто запись принимает и применяет, ведь только он видит, в каком порядке записи пришли на самом деле.
+
+Поэтому эпоха идёт вместе с записью, а получатель сравнивает её с самой свежей эпохой, которую знает, и отклоняет устаревшие. В моей работе получатель~--- узел-указатель \texttt{/hh/result}. Проверка \texttt{check(/hh/epoch)} и запись \texttt{setData(/hh/result)} уходят одним запросом \texttt{multi}, и сервер применяет либо обе операции, либо ни одной. Здесь ZooKeeper работает просто как хранилище указателя, а не как служба выборов. Если бы результат публиковался в S3 или в базу данных, эпоху пришлось бы проверять им, например условием \texttt{WHERE epoch <= :epoch} в \texttt{UPDATE}. Сессии и эфемерные узлы только выдают новому лидеру номер эпохи больше прежнего, а запретить старому лидеру писать не могут.
+
+\section{Выводы}
+
+\begin{enumerate}
+  \item Ансамбль из трёх серверов ZooKeeper 3.9.6 на Java 17 поднят на одном компьютере, у каждой копии свои порты и свой \texttt{dataDir} с \texttt{myid}. Без одного сервера ансамбль работает, без двух перестаёт обслуживать запросы. Перевыборы обычно занимают секунды, но в одном прогоне растянулись до \ensReelect~с: первый выбранный лидер не собрал кворум последователей и через $\texttt{initLimit} \cdot \texttt{tickTime}$ уступил место повторному раунду. Когда серверы возвращаются, данные на месте.
+  \item Эфемерный узел живёт, пока жива сессия. После закрытия окна \texttt{zkCli} он пропал через \ensuremath{\approx}\,\ephHup~с, то есть по тайм-ауту сессии, а после \texttt{quit}~--- сразу.
+  \item Координатор из ДЗ-3 с выборами через ZooKeeper и чекпоинтами переживает остановку лидера посреди расчёта. Запасной координатор становился лидером через \nofenceSwitch{} и \fenceSwitch~с после паузы. Он досчитывал 18 задач из 26 и получал результат, побайтно совпадающий с ДЗ-3.
+  \item Без защиты устаревший лидер после паузы записал результат второй раз, и указатель на результат получил версию 2. С защитой по эпохе его запись отклонена с \texttt{BadVersionError}, а в указателе остался результат запасного координатора.
+\end{enumerate}
+
+\appendix
+\section{Репозиторий и запуск}
+
+\begin{center}\href{https://github.com/seichikk/hh-zookeeper}{\repoUrl}\end{center}
+
+Нужны Docker Desktop и хранилище RustFS из ДЗ-3 (контейнер \texttt{rustfs} с бакетом \texttt{hh-lake}).
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+bash scripts/00_setup.sh       # java 17, три копии zookeeper 3.9.6, образ с kazoo
+bash scripts/01_ensemble.sh    # ансамбль, роли, остановка одного и двух серверов
+bash scripts/02_ephemeral.sh   # эфемерный узел
+bash scripts/03_failover.sh    # пауза лидера без защиты
+bash scripts/04_fencing.sh     # то же с FENCING=1
+bash scripts/05_report.sh      # этот отчёт
+bash scripts/99_stop.sh        # остановить серверы
+\end{Verbatim}
+
+Журналы координаторов лежат в папке \texttt{logs}: \texttt{nofence-a.log}, \texttt{nofence-b.log}, \texttt{fence-a.log} и \texttt{fence-b.log}. Конфигурации серверов~--- \texttt{zk/server1..3/conf/zoo.cfg} и \texttt{zk/server1..3/data/myid}, выводы всех команд~--- \texttt{report/out}.
+
+\end{document}

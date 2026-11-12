@@ -1,0 +1,39 @@
+
+==== второе окно: zkCli на server2 создаёт эфемерный узел ====
+
+$ zkCli.sh -server 127.0.0.1:2181 ls /
+[hh-eph, hh-test, zookeeper]
+
+$ zkCli.sh -server 127.0.0.1:2181 get -s /hh-eph
+узел из второго окна
+cZxid = 0x300000003
+ctime = Thu Nov 12 09:49:40 EST 2026
+mZxid = 0x300000003
+mtime = Thu Nov 12 09:49:40 EST 2026
+pZxid = 0x300000003
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x200013f44aa0001
+dataLength = 37
+numChildren = 0
+
+==== закрытие второго окна (SIGHUP) ====
+09:49:43.284 kill -HUP zkCli
+
+$ zkCli.sh -server 127.0.0.1:2183 ls /
+[hh-eph, hh-test, zookeeper]
+09:50:12.971 узел /hh-eph пропал через 29.6 с после закрытия окна
+
+$ zkCli.sh -server 127.0.0.1:2183 ls /
+[hh-test, zookeeper]
+
+==== третье окно: выход командой quit ====
+
+$ zkCli.sh -server 127.0.0.1:2181 ls /
+[hh-eph2, hh-test, zookeeper]
+09:50:16.850 quit
+09:50:18.447 узел /hh-eph2 пропал через 1.5 с после quit
+
+$ zkCli.sh -server 127.0.0.1:2181 ls /
+[hh-test, zookeeper]
